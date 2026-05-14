@@ -134,7 +134,7 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (*domain.Task, error
 
 	t.Priority = domain.TaskPriority(priority)
 	t.Status = domain.TaskStatus(status)
-	t.Phase = domain.DTMPhase(phase)
+	t.Category = domain.TaskCategory(phase)
 
 	if threadID.Valid {
 		t.ThreadID = &threadID.String
@@ -206,11 +206,11 @@ func (r *TaskRepository) CreateTask(t *domain.Task) (int64, error) {
 	}
 
 	res, err := r.db.Exec(query,
-		t.GuildID, t.ChannelID, threadID, t.Title, t.Description, string(t.Priority), string(t.Status), string(t.Phase),
+		t.GuildID, t.ChannelID, threadID, t.Title, t.Description, string(t.Priority), string(t.Status), string(t.Category),
 		assigneeID, deadline, demoURL, bpm, keyInfo, sharedLink, t.CreatedAt, t.UpdatedAt, completedAt,
 	)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("CreateTask: %w", err)
 	}
 
 	id, err := res.LastInsertId()
@@ -271,7 +271,7 @@ func (r *TaskRepository) UpdateTask(t *domain.Task) error {
 	}
 
 	_, err := r.db.Exec(query,
-		t.ChannelID, threadID, t.Title, t.Description, string(t.Priority), string(t.Status), string(t.Phase),
+		t.ChannelID, threadID, t.Title, t.Description, string(t.Priority), string(t.Status), string(t.Category),
 		assigneeID, deadline, demoURL, bpm, keyInfo, sharedLink, t.UpdatedAt, completedAt, t.ID,
 	)
 	return err
@@ -282,33 +282,32 @@ func (r *TaskRepository) DeleteTask(id int64) error {
 	return err
 }
 
-// ListTasks は未完了タスク（または指定ステータスのタスク）を優先度・期限順で取得します
-func (r *TaskRepository) ListTasks(guildID string, status *domain.TaskStatus) ([]*domain.Task, error) {
-	baseQuery := `
+func (r *TaskRepository) ListTasks(guildID string, filter *domain.TaskFilter) ([]*domain.Task, error) {
+	query := `
 	SELECT id, guild_id, channel_id, thread_id, title, description, priority, status, phase,
 	       assignee_id, deadline, demo_url, bpm, key_info, shared_link, created_at, updated_at, completed_at
 	FROM tasks
-	WHERE guild_id = ?
-	`
-	var rows *sql.Rows
-	var err error
+	WHERE guild_id = ? AND status != ?`
 
-	orderClause := `
-	ORDER BY 
-		CASE priority 
-			WHEN 'High' THEN 1 
-			WHEN 'Medium' THEN 2 
-			WHEN 'Low' THEN 3 
-			ELSE 4 
-		END,
-		deadline ASC, created_at ASC
-	`
+	args := []any{guildID, string(domain.StatusDone)}
 
-	if status != nil {
-		rows, err = r.db.Query(baseQuery+" AND status = ? "+orderClause, guildID, string(*status))
-	} else {
-		rows, err = r.db.Query(baseQuery+" AND status != ? "+orderClause, guildID, string(domain.StatusDone))
+	if filter != nil {
+		if filter.Category != nil {
+			query += " AND phase = ?"
+			args = append(args, string(*filter.Category))
+		}
+		if filter.Priority != nil {
+			query += " AND priority = ?"
+			args = append(args, string(*filter.Priority))
+		}
 	}
+
+	query += `
+	ORDER BY
+		CASE priority WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 ELSE 4 END,
+		deadline ASC, created_at ASC`
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -323,6 +322,25 @@ func (r *TaskRepository) ListTasks(guildID string, status *domain.TaskStatus) ([
 		tasks = append(tasks, t)
 	}
 	return tasks, nil
+}
+
+func (r *TaskRepository) GetRemindersByGuild(guildID string) ([]*domain.Reminder, error) {
+	query := `SELECT id, guild_id, channel_id, user_id, message, scheduled_at, created_at FROM reminders WHERE guild_id = ? ORDER BY scheduled_at ASC`
+	rows, err := r.db.Query(query, guildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reminders []*domain.Reminder
+	for rows.Next() {
+		var rem domain.Reminder
+		if err := rows.Scan(&rem.ID, &rem.GuildID, &rem.ChannelID, &rem.UserID, &rem.Message, &rem.ScheduledAt, &rem.CreatedAt); err != nil {
+			return nil, err
+		}
+		reminders = append(reminders, &rem)
+	}
+	return reminders, nil
 }
 
 // GetUnremindedDayTasks は期限が24時間以内で、まだ1日前リマインドを送っていない未完了タスクを取得します

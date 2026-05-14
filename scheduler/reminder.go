@@ -55,6 +55,7 @@ func (s *ReminderScheduler) Stop() {
 func (s *ReminderScheduler) processScheduledReminders(now time.Time) {
 	reminders, err := s.repo.GetPendingReminders(now)
 	if err != nil {
+		log.Printf("リマインダー取得エラー: %v", err)
 		return
 	}
 	for _, rem := range reminders {
@@ -62,8 +63,12 @@ func (s *ReminderScheduler) processScheduledReminders(now time.Time) {
 		if rem.UserID != "" {
 			mention = fmt.Sprintf("<@%s> ", rem.UserID)
 		}
-		_, _ = s.session.ChannelMessageSend(rem.ChannelID, fmt.Sprintf("⏰ %s**リマインダー**\n%s", mention, rem.Message))
-		_ = s.repo.DeleteReminder(rem.ID)
+		if _, err := s.session.ChannelMessageSend(rem.ChannelID, fmt.Sprintf("⏰ %s**リマインダー**\n%s", mention, rem.Message)); err != nil {
+			log.Printf("リマインダー送信エラー (id=%d, ch=%s): %v", rem.ID, rem.ChannelID, err)
+		}
+		if err := s.repo.DeleteReminder(rem.ID); err != nil {
+			log.Printf("リマインダー削除エラー (id=%d): %v", rem.ID, err)
+		}
 	}
 }
 

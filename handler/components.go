@@ -45,6 +45,23 @@ func (h *CommandHandler) HandleComponent(s *discordgo.Session, i *discordgo.Inte
 		return
 	}
 
+	if strings.HasPrefix(customID, "cancel_reminder_") {
+		idStr := strings.TrimPrefix(customID, "cancel_reminder_")
+		remID, err := strconv.ParseInt(idStr, 10, 64)
+		if err == nil {
+			_ = h.repo.DeleteReminder(remID)
+		}
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseUpdateMessage,
+			Data: &discordgo.InteractionResponseData{
+				Content:    "✅ リマインダーをキャンセルしました。",
+				Embeds:     []*discordgo.MessageEmbed{},
+				Components: []discordgo.MessageComponent{},
+			},
+		})
+		return
+	}
+
 	if customID == "back_list" {
 		tasks, err := h.repo.ListTasks(i.GuildID, nil)
 		if err != nil {
@@ -165,9 +182,9 @@ func (h *CommandHandler) HandleComponent(s *discordgo.Session, i *discordgo.Inte
 
 	case "phase":
 		if len(data.Values) > 0 {
-			task.Phase = domain.DTMPhase(data.Values[0])
+			task.Category = domain.TaskCategory(data.Values[0])
 			_ = h.repo.UpdateTask(task)
-			responseContent = fmt.Sprintf("🎶 制作フェーズを「%s」に変更しました。", task.Phase)
+			responseContent = fmt.Sprintf("📂 カテゴリを「%s」に変更しました。", task.Category)
 		}
 	}
 

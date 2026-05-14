@@ -20,17 +20,26 @@ const (
 	PriorityLow    TaskPriority = "Low"
 )
 
-type DTMPhase string
+type TaskCategory string
 
 const (
-	PhaseNone      DTMPhase = "なし"
-	PhaseLyrics    DTMPhase = "作詞"
-	PhaseCompose   DTMPhase = "作曲"
-	PhaseArrange   DTMPhase = "編曲"
-	PhaseMix       DTMPhase = "Mix"
-	PhaseMastering DTMPhase = "Mas"
-	PhaseRecording DTMPhase = "レコーディング"
+	CategoryNone        TaskCategory = "なし"
+	CategoryBuhi        TaskCategory = "部費"
+	CategoryMerchandise TaskCategory = "物販関連"
+	CategoryInventory   TaskCategory = "物品管理"
+	CategoryAccount     TaskCategory = "口座計画"
+	CategoryMusicReview TaskCategory = "楽曲品評会"
+	CategoryDesign      TaskCategory = "デザイン"
+	CategoryFestival    TaskCategory = "学祭"
+	CategoryWelcome     TaskCategory = "新人歓迎会"
+	CategoryChristmas   TaskCategory = "クリスマス会"
+	CategoryImportant   TaskCategory = "大事な話"
 )
+
+type TaskFilter struct {
+	Category *TaskCategory
+	Priority *TaskPriority
+}
 
 type Task struct {
 	ID          int64
@@ -41,7 +50,7 @@ type Task struct {
 	Description string
 	Priority    TaskPriority
 	Status      TaskStatus
-	Phase       DTMPhase
+	Category    TaskCategory
 	AssigneeID  *string
 	Deadline    *time.Time
 	DemoURL     *string
@@ -81,7 +90,13 @@ func (t *Task) PriorityLabel() string {
 	}
 }
 
-// 期限切れかどうかを判定
+func (t *Task) CategoryLabel() string {
+	if t.Category == CategoryNone || t.Category == "" {
+		return "なし"
+	}
+	return string(t.Category)
+}
+
 func (t *Task) IsOverdue(now time.Time) bool {
 	if t.Deadline == nil || t.Status == StatusDone {
 		return false

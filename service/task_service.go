@@ -37,8 +37,8 @@ func (s *TaskService) BuildTaskEmbed(t *domain.Task) *discordgo.MessageEmbed {
 				Inline: true,
 			},
 			{
-				Name:   "制作フェーズ",
-				Value:  string(t.Phase),
+				Name:   "カテゴリ",
+				Value:  t.CategoryLabel(),
 				Inline: true,
 			},
 		},
@@ -66,31 +66,10 @@ func (s *TaskService) BuildTaskEmbed(t *domain.Task) *discordgo.MessageEmbed {
 		Inline: true,
 	})
 
-	// DTM特化情報の追加
-	if t.BPM != nil {
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   "🎵 BPM",
-			Value:  fmt.Sprintf("%.1f", *t.BPM),
-			Inline: true,
-		})
-	}
-	if t.KeyInfo != nil && *t.KeyInfo != "" {
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   "🔑 Key",
-			Value:  *t.KeyInfo,
-			Inline: true,
-		})
-	}
-	if t.DemoURL != nil && *t.DemoURL != "" {
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:  "🎧 デモ音源",
-			Value: fmt.Sprintf("[試聴・ダウンロードを開く](%s)", *t.DemoURL),
-		})
-	}
 	if t.SharedLink != nil && *t.SharedLink != "" {
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:  "📁 共有リンク (Drive/Dropbox等)",
-			Value: fmt.Sprintf("[共有フォルダを開く](%s)", *t.SharedLink),
+			Name:  "📁 共有リンク",
+			Value: fmt.Sprintf("[開く](%s)", *t.SharedLink),
 		})
 	}
 
@@ -142,20 +121,23 @@ func (s *TaskService) BuildTaskDetailComponents(t *domain.Task) []discordgo.Mess
 		},
 	}
 
-	// 3行目: 制作フェーズ変更セレクトメニュー
 	row3 := discordgo.ActionsRow{
 		Components: []discordgo.MessageComponent{
 			discordgo.SelectMenu{
 				CustomID:    fmt.Sprintf("phase_%d", t.ID),
-				Placeholder: "🎶 制作フェーズを変更...",
+				Placeholder: "📂 カテゴリを変更...",
 				Options: []discordgo.SelectMenuOption{
-					{Label: "なし", Value: string(domain.PhaseNone), Default: t.Phase == domain.PhaseNone},
-					{Label: "作詞", Value: string(domain.PhaseLyrics), Default: t.Phase == domain.PhaseLyrics},
-					{Label: "作曲", Value: string(domain.PhaseCompose), Default: t.Phase == domain.PhaseCompose},
-					{Label: "編曲", Value: string(domain.PhaseArrange), Default: t.Phase == domain.PhaseArrange},
-					{Label: "Mix", Value: string(domain.PhaseMix), Default: t.Phase == domain.PhaseMix},
-					{Label: "Mas", Value: string(domain.PhaseMastering), Default: t.Phase == domain.PhaseMastering},
-					{Label: "レコーディング", Value: string(domain.PhaseRecording), Default: t.Phase == domain.PhaseRecording},
+					{Label: "なし", Value: string(domain.CategoryNone), Default: t.Category == domain.CategoryNone},
+					{Label: "部費", Value: string(domain.CategoryBuhi), Default: t.Category == domain.CategoryBuhi},
+					{Label: "物販関連", Value: string(domain.CategoryMerchandise), Default: t.Category == domain.CategoryMerchandise},
+					{Label: "物品管理", Value: string(domain.CategoryInventory), Default: t.Category == domain.CategoryInventory},
+					{Label: "口座計画", Value: string(domain.CategoryAccount), Default: t.Category == domain.CategoryAccount},
+					{Label: "楽曲品評会", Value: string(domain.CategoryMusicReview), Default: t.Category == domain.CategoryMusicReview},
+					{Label: "デザイン", Value: string(domain.CategoryDesign), Default: t.Category == domain.CategoryDesign},
+					{Label: "学祭", Value: string(domain.CategoryFestival), Default: t.Category == domain.CategoryFestival},
+					{Label: "新人歓迎会", Value: string(domain.CategoryWelcome), Default: t.Category == domain.CategoryWelcome},
+					{Label: "クリスマス会", Value: string(domain.CategoryChristmas), Default: t.Category == domain.CategoryChristmas},
+					{Label: "大事な話", Value: string(domain.CategoryImportant), Default: t.Category == domain.CategoryImportant},
 				},
 			},
 		},
@@ -202,7 +184,7 @@ func (s *TaskService) BuildTaskListSummary(tasks []*domain.Task, titlePrefix str
 			if len(label) > 50 {
 				label = label[:47] + "..."
 			}
-			descOpt := fmt.Sprintf("優先度:%s | フェーズ:%s", t.Priority, t.Phase)
+			descOpt := fmt.Sprintf("優先度:%s | カテゴリ:%s", t.Priority, t.CategoryLabel())
 			options = append(options, discordgo.SelectMenuOption{
 				Label:       fmt.Sprintf("ID:%d | %s", t.ID, label),
 				Description: descOpt,

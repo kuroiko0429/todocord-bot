@@ -60,17 +60,21 @@ func (h *CommandHandler) Commands() []*discordgo.ApplicationCommand {
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "phase",
-					Description: "DTM制作フェーズ",
+					Name:        "category",
+					Description: "カテゴリ",
 					Required:    false,
 					Choices: []*discordgo.ApplicationCommandOptionChoice{
-						{Name: "作詞", Value: string(domain.PhaseLyrics)},
-						{Name: "作曲", Value: string(domain.PhaseCompose)},
-						{Name: "編曲", Value: string(domain.PhaseArrange)},
-						{Name: "Mix", Value: string(domain.PhaseMix)},
-						{Name: "Mas", Value: string(domain.PhaseMastering)},
-						{Name: "レコーディング", Value: string(domain.PhaseRecording)},
-						{Name: "なし", Value: string(domain.PhaseNone)},
+						{Name: "部費", Value: string(domain.CategoryBuhi)},
+						{Name: "物販関連", Value: string(domain.CategoryMerchandise)},
+						{Name: "物品管理", Value: string(domain.CategoryInventory)},
+						{Name: "口座計画", Value: string(domain.CategoryAccount)},
+						{Name: "楽曲品評会", Value: string(domain.CategoryMusicReview)},
+						{Name: "デザイン", Value: string(domain.CategoryDesign)},
+						{Name: "学祭", Value: string(domain.CategoryFestival)},
+						{Name: "新人歓迎会", Value: string(domain.CategoryWelcome)},
+						{Name: "クリスマス会", Value: string(domain.CategoryChristmas)},
+						{Name: "大事な話", Value: string(domain.CategoryImportant)},
+						{Name: "なし", Value: string(domain.CategoryNone)},
 					},
 				},
 				{
@@ -114,6 +118,37 @@ func (h *CommandHandler) Commands() []*discordgo.ApplicationCommand {
 		{
 			Name:        "list",
 			Description: "現在残っているタスク一覧を表示・管理します",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "category",
+					Description: "カテゴリで絞り込む",
+					Required:    false,
+					Choices: []*discordgo.ApplicationCommandOptionChoice{
+						{Name: "部費", Value: string(domain.CategoryBuhi)},
+						{Name: "物販関連", Value: string(domain.CategoryMerchandise)},
+						{Name: "物品管理", Value: string(domain.CategoryInventory)},
+						{Name: "口座計画", Value: string(domain.CategoryAccount)},
+						{Name: "楽曲品評会", Value: string(domain.CategoryMusicReview)},
+						{Name: "デザイン", Value: string(domain.CategoryDesign)},
+						{Name: "学祭", Value: string(domain.CategoryFestival)},
+						{Name: "新人歓迎会", Value: string(domain.CategoryWelcome)},
+						{Name: "クリスマス会", Value: string(domain.CategoryChristmas)},
+						{Name: "大事な話", Value: string(domain.CategoryImportant)},
+					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "priority",
+					Description: "優先度で絞り込む",
+					Required:    false,
+					Choices: []*discordgo.ApplicationCommandOptionChoice{
+						{Name: "🔴 High", Value: string(domain.PriorityHigh)},
+						{Name: "🟡 Medium", Value: string(domain.PriorityMedium)},
+						{Name: "🟢 Low", Value: string(domain.PriorityLow)},
+					},
+				},
+			},
 		},
 		{
 			Name:        "assign",
@@ -156,17 +191,21 @@ func (h *CommandHandler) Commands() []*discordgo.ApplicationCommand {
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "phase",
-					Description: "新しい制作フェーズ",
+					Name:        "category",
+					Description: "新しいカテゴリ",
 					Required:    false,
 					Choices: []*discordgo.ApplicationCommandOptionChoice{
-						{Name: "作詞", Value: string(domain.PhaseLyrics)},
-						{Name: "作曲", Value: string(domain.PhaseCompose)},
-						{Name: "編曲", Value: string(domain.PhaseArrange)},
-						{Name: "Mix", Value: string(domain.PhaseMix)},
-						{Name: "Mas", Value: string(domain.PhaseMastering)},
-						{Name: "レコーディング", Value: string(domain.PhaseRecording)},
-						{Name: "なし", Value: string(domain.PhaseNone)},
+						{Name: "部費", Value: string(domain.CategoryBuhi)},
+						{Name: "物販関連", Value: string(domain.CategoryMerchandise)},
+						{Name: "物品管理", Value: string(domain.CategoryInventory)},
+						{Name: "口座計画", Value: string(domain.CategoryAccount)},
+						{Name: "楽曲品評会", Value: string(domain.CategoryMusicReview)},
+						{Name: "デザイン", Value: string(domain.CategoryDesign)},
+						{Name: "学祭", Value: string(domain.CategoryFestival)},
+						{Name: "新人歓迎会", Value: string(domain.CategoryWelcome)},
+						{Name: "クリスマス会", Value: string(domain.CategoryChristmas)},
+						{Name: "大事な話", Value: string(domain.CategoryImportant)},
+						{Name: "なし", Value: string(domain.CategoryNone)},
 					},
 				},
 			},
@@ -216,6 +255,10 @@ func (h *CommandHandler) Commands() []*discordgo.ApplicationCommand {
 		{
 			Name:        "mtg",
 			Description: "定例会用のアジェンダ（未完了タスク優先度順リスト）を作成します",
+		},
+		{
+			Name:        "reminders",
+			Description: "設定中のリマインダー一覧を表示・削除します",
 		},
 		{
 			Name:        "remind",
@@ -310,6 +353,8 @@ func (h *CommandHandler) HandleCommand(s *discordgo.Session, i *discordgo.Intera
 		h.handleDelete(s, i)
 	case "mtg":
 		h.handleMtg(s, i)
+	case "reminders":
+		h.handleReminders(s, i)
 	case "remind":
 		h.handleRemind(s, i)
 	case "report":
@@ -331,9 +376,9 @@ func (h *CommandHandler) handleAdd(s *discordgo.Session, i *discordgo.Interactio
 		priority = domain.TaskPriority(opt.StringValue())
 	}
 
-	phase := domain.PhaseNone
-	if opt, ok := opts["phase"]; ok {
-		phase = domain.DTMPhase(opt.StringValue())
+	category := domain.CategoryNone
+	if opt, ok := opts["category"]; ok {
+		category = domain.TaskCategory(opt.StringValue())
 	}
 
 	var deadline *time.Time
@@ -392,7 +437,7 @@ func (h *CommandHandler) handleAdd(s *discordgo.Session, i *discordgo.Interactio
 		Description: desc,
 		Priority:    priority,
 		Status:      domain.StatusTodo,
-		Phase:       phase,
+		Category:    category,
 		AssigneeID:  assigneeID,
 		Deadline:    deadline,
 		DemoURL:     demoURL,
@@ -449,7 +494,22 @@ func (h *CommandHandler) handleAdd(s *discordgo.Session, i *discordgo.Interactio
 }
 
 func (h *CommandHandler) handleList(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	tasks, err := h.repo.ListTasks(i.GuildID, nil)
+	opts := parseOptions(i.ApplicationCommandData().Options)
+
+	var filter domain.TaskFilter
+	titleSuffix := ""
+	if opt, ok := opts["category"]; ok {
+		c := domain.TaskCategory(opt.StringValue())
+		filter.Category = &c
+		titleSuffix += fmt.Sprintf(" [%s]", c)
+	}
+	if opt, ok := opts["priority"]; ok {
+		p := domain.TaskPriority(opt.StringValue())
+		filter.Priority = &p
+		titleSuffix += fmt.Sprintf(" [%s]", p)
+	}
+
+	tasks, err := h.repo.ListTasks(i.GuildID, &filter)
 	if err != nil {
 		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -461,12 +521,67 @@ func (h *CommandHandler) handleList(s *discordgo.Session, i *discordgo.Interacti
 		return
 	}
 
-	embed, components := h.service.BuildTaskListSummary(tasks, "")
+	embed, components := h.service.BuildTaskListSummary(tasks, titleSuffix)
 	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds:     []*discordgo.MessageEmbed{embed},
 			Components: components,
+		},
+	})
+}
+
+func (h *CommandHandler) handleReminders(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	reminders, err := h.repo.GetRemindersByGuild(i.GuildID)
+	if err != nil {
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{Content: "❌ リマインダーの取得に失敗しました", Flags: discordgo.MessageFlagsEphemeral},
+		})
+		return
+	}
+
+	if len(reminders) == 0 {
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "設定中のリマインダーはありません。",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	var desc string
+	var rows []discordgo.MessageComponent
+	for idx, rem := range reminders {
+		if idx >= 5 {
+			desc += fmt.Sprintf("\n...他 %d 件", len(reminders)-5)
+			break
+		}
+		desc += fmt.Sprintf("**#%d** <t:%d:F>\n> %s\n", rem.ID, rem.ScheduledAt.Unix(), rem.Message)
+		rows = append(rows, discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					CustomID: fmt.Sprintf("cancel_reminder_%d", rem.ID),
+					Label:    fmt.Sprintf("#%d をキャンセル", rem.ID),
+					Style:    discordgo.DangerButton,
+				},
+			},
+		})
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title:       "⏰ 設定中のリマインダー一覧",
+		Description: desc,
+		Color:       0x3498DB,
+	}
+	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds:     []*discordgo.MessageEmbed{embed},
+			Components: rows,
+			Flags:      discordgo.MessageFlagsEphemeral,
 		},
 	})
 }
@@ -532,8 +647,8 @@ func (h *CommandHandler) handleStatus(s *discordgo.Session, i *discordgo.Interac
 		task.Status = newStatus
 	}
 
-	if opt, ok := opts["phase"]; ok {
-		task.Phase = domain.DTMPhase(opt.StringValue())
+	if opt, ok := opts["category"]; ok {
+		task.Category = domain.TaskCategory(opt.StringValue())
 	}
 
 	if err := h.repo.UpdateTask(task); err != nil {
