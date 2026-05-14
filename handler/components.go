@@ -83,6 +83,40 @@ func (h *CommandHandler) HandleComponent(s *discordgo.Session, i *discordgo.Inte
 	var responseContent string
 
 	switch action {
+	case "remind":
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseModal,
+			Data: &discordgo.InteractionResponseData{
+				CustomID: fmt.Sprintf("remind_modal_%d", taskID),
+				Title:    "リマインダーを設定",
+				Components: []discordgo.MessageComponent{
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID:    "remind_time",
+								Label:       "通知日時",
+								Style:       discordgo.TextInputShort,
+								Placeholder: "2026-05-20 15:00",
+								Required:    true,
+							},
+						},
+					},
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID:    "remind_message",
+								Label:       "通知メッセージ",
+								Style:       discordgo.TextInputParagraph,
+								Placeholder: "リマインダーの内容を入力...",
+								Required:    true,
+							},
+						},
+					},
+				},
+			},
+		})
+		return
+
 	case "complete":
 		if task.Status != domain.StatusDone {
 			now := time.Now()

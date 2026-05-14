@@ -218,6 +218,24 @@ func (h *CommandHandler) Commands() []*discordgo.ApplicationCommand {
 			Description: "定例会用のアジェンダ（未完了タスク優先度順リスト）を作成します",
 		},
 		{
+			Name:        "remind",
+			Description: "指定した日時にメッセージを通知します",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "time",
+					Description: "通知日時 (例: 2026-05-20 15:00)",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "message",
+					Description: "通知するメッセージ",
+					Required:    true,
+				},
+			},
+		},
+		{
 			Name:        "report",
 			Description: "月ごとの稼働・完了タスクレポートを出力します",
 			Options: []*discordgo.ApplicationCommandOption{
@@ -292,6 +310,8 @@ func (h *CommandHandler) HandleCommand(s *discordgo.Session, i *discordgo.Intera
 		h.handleDelete(s, i)
 	case "mtg":
 		h.handleMtg(s, i)
+	case "remind":
+		h.handleRemind(s, i)
 	case "report":
 		h.handleReport(s, i)
 	}
@@ -632,6 +652,68 @@ func (h *CommandHandler) handleMtg(s *discordgo.Session, i *discordgo.Interactio
 			Content:    "📢 **定例会用アジェンダを出力しました。** 各タスクの進捗状況を確認しましょう！",
 			Embeds:     []*discordgo.MessageEmbed{embed},
 			Components: components,
+		},
+	})
+}
+
+func (h *CommandHandler) handleRemind(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	opts := parseOptions(i.ApplicationCommandData().Options)
+
+	timeStr := opts["time"].StringValue()
+	message := opts["message"].StringValue()
+
+	scheduledAt, err := parseDeadline(timeStr)
+	if err != nil || scheduledAt == nil {
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "⚠️ 日時の形式が正しくありません。`2026-05-20 15:00` のように入力してください。",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	if scheduledAt.Before(time.Now()) {
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "⚠️ 過去の日時は指定できません。",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	userID := ""
+	if i.Member != nil && i.Member.User != nil {
+		userID = i.Member.User.ID
+	}
+
+	rem := &domain.Reminder{
+		GuildID:     i.GuildID,
+		ChannelID:   i.ChannelID,
+		UserID:      userID,
+		Message:     message,
+		ScheduledAt: *scheduledAt,
+	}
+
+	if _, err := h.repo.CreateReminder(rem); err != nil {
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("❌ リマインダーの保存に失敗しました: %v", err),
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: fmt.Sprintf("⏰ リマインダーを設定しました！\n**日時:** <t:%d:F>\n**内容:** %s", scheduledAt.Unix(), message),
+			Flags:   discordgo.MessageFlagsEphemeral,
 		},
 	})
 }

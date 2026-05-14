@@ -115,6 +115,11 @@ func (s *TaskService) BuildTaskDetailComponents(t *domain.Task) []discordgo.Mess
 				Disabled: t.ThreadID != nil, // 既にスレッドがある場合は無効化
 			},
 			discordgo.Button{
+				CustomID: fmt.Sprintf("remind_%d", t.ID),
+				Label:    "リマインダー設定 ⏰",
+				Style:    discordgo.SecondaryButton,
+			},
+			discordgo.Button{
 				CustomID: "back_list",
 				Label:    "◀ タスク一覧に戻る",
 				Style:    discordgo.PrimaryButton,

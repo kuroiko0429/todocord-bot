@@ -36,31 +36,83 @@ func (r *TaskRepository) Close() error {
 }
 
 func (r *TaskRepository) migrate() error {
-	query := `
-	CREATE TABLE IF NOT EXISTS tasks (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		guild_id TEXT NOT NULL,
-		channel_id TEXT NOT NULL,
-		thread_id TEXT,
-		title TEXT NOT NULL,
-		description TEXT NOT NULL,
-		priority TEXT NOT NULL,
-		status TEXT NOT NULL,
-		phase TEXT NOT NULL,
-		assignee_id TEXT,
-		deadline DATETIME,
-		demo_url TEXT,
-		bpm REAL,
-		key_info TEXT,
-		shared_link TEXT,
-		created_at DATETIME NOT NULL,
-		updated_at DATETIME NOT NULL,
-		completed_at DATETIME,
-		reminded_day INTEGER DEFAULT 0,
-		reminded_hour INTEGER DEFAULT 0
-	);
-	`
-	_, err := r.db.Exec(query)
+	queries := []string{
+		`CREATE TABLE IF NOT EXISTS tasks (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			guild_id TEXT NOT NULL,
+			channel_id TEXT NOT NULL,
+			thread_id TEXT,
+			title TEXT NOT NULL,
+			description TEXT NOT NULL,
+			priority TEXT NOT NULL,
+			status TEXT NOT NULL,
+			phase TEXT NOT NULL,
+			assignee_id TEXT,
+			deadline DATETIME,
+			demo_url TEXT,
+			bpm REAL,
+			key_info TEXT,
+			shared_link TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			completed_at DATETIME,
+			reminded_day INTEGER DEFAULT 0,
+			reminded_hour INTEGER DEFAULT 0
+		);`,
+		`CREATE TABLE IF NOT EXISTS reminders (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			guild_id TEXT NOT NULL,
+			channel_id TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			message TEXT NOT NULL,
+			scheduled_at DATETIME NOT NULL,
+			created_at DATETIME NOT NULL
+		);`,
+	}
+	for _, q := range queries {
+		if _, err := r.db.Exec(q); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *TaskRepository) CreateReminder(rem *domain.Reminder) (int64, error) {
+	query := `INSERT INTO reminders (guild_id, channel_id, user_id, message, scheduled_at, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+	rem.CreatedAt = time.Now()
+	res, err := r.db.Exec(query, rem.GuildID, rem.ChannelID, rem.UserID, rem.Message, rem.ScheduledAt, rem.CreatedAt)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	rem.ID = id
+	return id, nil
+}
+
+func (r *TaskRepository) GetPendingReminders(now time.Time) ([]*domain.Reminder, error) {
+	query := `SELECT id, guild_id, channel_id, user_id, message, scheduled_at, created_at FROM reminders WHERE scheduled_at <= ?`
+	rows, err := r.db.Query(query, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reminders []*domain.Reminder
+	for rows.Next() {
+		var rem domain.Reminder
+		if err := rows.Scan(&rem.ID, &rem.GuildID, &rem.ChannelID, &rem.UserID, &rem.Message, &rem.ScheduledAt, &rem.CreatedAt); err != nil {
+			return nil, err
+		}
+		reminders = append(reminders, &rem)
+	}
+	return reminders, nil
+}
+
+func (r *TaskRepository) DeleteReminder(id int64) error {
+	_, err := r.db.Exec("DELETE FROM reminders WHERE id = ?", id)
 	return err
 }
 
