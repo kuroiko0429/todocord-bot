@@ -1,0 +1,19 @@
+# Binaries
+bot
+*.exe
+
+# .env (機密情報が含まれるため必ずgit管理外に)
+.env
+
+# SQLite database
+*.db
+*.db-shm
+*.db-wal
+
+# Go test cache
+*.test
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
