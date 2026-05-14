@@ -1,0 +1,38 @@
+services:
+  todocord-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: todocord-bot
+    restart: unless-stopped
+
+    # .envファイルから環境変数を読み込む
+    env_file:
+      - .env
+
+    # 環境変数（.envで上書き可能。DB_PATHはVolumeと一致させること）
+    environment:
+      - TZ=Asia/Tokyo
+      - DB_PATH=/data/todocord.db
+
+    volumes:
+      # SQLiteのデータベースファイルを永続化
+      - todocord-data:/data
+
+    # ヘルスチェック（プロセスが死んでいないか確認）
+    healthcheck:
+      test: ["CMD", "pgrep", "-x", "bot"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  todocord-data:
+    name: todocord-data

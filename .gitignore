@@ -1,5 +1,6 @@
 # Binaries
 bot
+build/
 *.exe
 
 # .env (機密情報が含まれるため必ずgit管理外に)
@@ -9,6 +10,9 @@ bot
 *.db
 *.db-shm
 *.db-wal
+
+# Docker
+.dockerignore
 
 # Go test cache
 *.test
